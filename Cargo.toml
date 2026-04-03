@@ -1,0 +1,68 @@
+[package]
+name = "RAG_Server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+uuid = { version = "1.19.0", features = ["serde", "v4"] }
+
+redis = { version = "0.23.0", features = ["tls-rustls"] }
+
+qdrant-client = "1"
+
+ort = { version = "=2.0.0-rc.10", features = ["ndarray"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+
+axum = { version = "0.8.6", features = ["multipart"] }
+
+ndarray = "0.16.1"
+
+tower-http = { version = "0.6.6", features = ["cors"] }
+
+sqlx = { version = "0.8.6", features = [
+    "runtime-tokio",
+    "postgres",
+    "macros",
+    "uuid",
+    "tls-native-tls",
+    "time",
+    "chrono",
+] }
+
+dotenvy = "0.15.7"
+anyhow = "1.0"
+
+tokenizers = "0.22.1"
+
+reqwest = { version = "0.12.25", features = ["multipart", "json"] }
+
+argon2 = "0.5.3"
+
+rand_core = { version = "0.9.3", features = ["std"] }
+
+tower-cookies = "0.11.0"
+cookie = "0.18.1"
+
+jwt = "0.16.0"
+hmac = "0.12.1"
+
+sha2 = "0.10.9"
+
+chrono = "0.4.42"
+
+async-openai = "0.34.0"
+
+similarity = { version = "0.2.0", features = ["parallel", "fft"] }
+
+groq-api-rust = "0.3.1"
+
+axum-governor = "1"
+
+lazy-limit = "1"
+
+real = { version = "0.1", features = ["axum"] }
+
