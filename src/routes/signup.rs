@@ -1,6 +1,6 @@
 use argon2::{Argon2, password_hash::{SaltString, rand_core::OsRng,
  PasswordHasher,}};
-use axum::{Json, extract::State};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
