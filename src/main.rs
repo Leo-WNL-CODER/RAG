@@ -131,7 +131,8 @@ async fn main() -> Result<()> {
     .with_state(s_t);
 
     
-    let listner=tokio::net::TcpListener::bind("localhost:3001").await?;
+    let port = std::env::var("PORT").unwrap_or_else(|_| "3001".to_string());
+    let listner = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
 
     axum::serve(listner,app).await?;
 
