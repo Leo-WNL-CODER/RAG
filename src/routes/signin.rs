@@ -81,9 +81,8 @@ pub async fn user_signin(
    
     access_cookie.set_http_only(true);
     access_cookie.set_expires(access_expires);
-    access_cookie.set_same_site(SameSite::Lax);
-    // access_cookie.set_same_site(SameSite::None);
-    access_cookie.set_secure(false); // required for localhost
+    access_cookie.set_same_site(SameSite::None); // cross-site: Vercel → Render
+    access_cookie.set_secure(true);              // required for SameSite::None
     access_cookie.set_path("/");
     //Refresh Token
     let Ok(refresh_token)=refresh_token(q.id) else{
@@ -92,16 +91,11 @@ pub async fn user_signin(
     let mut refresh_cookie=Cookie::new("refresh_token", refresh_token.clone());
     let refresh_expires=OffsetDateTime::now_utc()+Duration::days(3);
 
-    
     refresh_cookie.set_http_only(true);
-    // refresh_cookie.set_secure(true);
-    refresh_cookie.set_same_site(SameSite::Lax);
-    // refresh_cookie.set_same_site(SameSite::None);
-    // refresh_cookie.set_path("/refresh");
+    refresh_cookie.set_same_site(SameSite::None); // cross-site: Vercel → Render
+    refresh_cookie.set_secure(true);              // required for SameSite::None
     refresh_cookie.set_expires(refresh_expires);
-    refresh_cookie.set_secure(false); // required for localhost
-    refresh_cookie.set_path("/");
-    // redis.set("refewsh_cookie", &refresh_token);
+    refresh_cookie.set_path("/refresh");          // scope refresh token to its route
     if redis
     .set_ex::<_, _, ()>(format!("{}:{}","refresh_cookie",q.id), refresh_token.clone(), 24 * 60 * 60)
     .is_err(){

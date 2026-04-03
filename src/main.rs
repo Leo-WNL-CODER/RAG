@@ -116,7 +116,6 @@ async fn main() -> Result<()> {
     let protected=Router::new()
     .route("/parseDoc", post(parse_doc))
     .layer(DefaultBodyLimit::max(5*1024*1024))
-    .route("/me",get(user_profile))
     .route("/userQuery", get(user_querying))
     .route_layer(middleware::from_fn_with_state(s_t.clone(), is_auth));
 

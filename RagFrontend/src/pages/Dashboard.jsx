@@ -59,7 +59,6 @@ export const Dashboard = () => {
 
     const formData = new FormData();
     formData.append('myFile', selectedFile);
-    console.log("Uploading file...");
     try {
       const response = await api.post('/parseDoc', formData);
 
@@ -67,7 +66,6 @@ export const Dashboard = () => {
         setUploadSuccess(true);
         setError("");
       } else {
-        console.log("Upload failed");
         throw new Error('Upload failed');
       }
     } catch (err) {

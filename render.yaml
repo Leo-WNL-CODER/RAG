@@ -1,0 +1,33 @@
+services:
+  # ── Rust Axum Server ──────────────────────────────────────
+  - type: web
+    name: rag-server-rust
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore   # closest free region to India
+
+    envVars:
+      - key: DATABASE_URL
+        sync: false       # set manually in Render dashboard
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_ACCESS_TOKEN_SECRET
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: PYTHON_PARSER_URL
+        sync: false       # set after deploying python parser
+      - key: FRONTEND_URL
+        sync: false
+
+  # ── Python Parser Service ─────────────────────────────────
+  - type: web
+    name: rag-python-parser
+    runtime: docker
+    dockerfilePath: ./python_parser_service/Dockerfile
+    plan: free
+    region: singapore
+    # No secrets needed — stateless parser

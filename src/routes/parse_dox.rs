@@ -21,7 +21,6 @@ pub async fn parse_doc(
     mut multipart: Multipart,
 ) ->impl IntoResponse {
     
-    println!("parse_doc");
     let client = &state.reqwest_client;
     let pg_pool = &state.db_pool;
 

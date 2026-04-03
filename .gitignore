@@ -5,3 +5,10 @@ qdrant_storage/
 models/
 node_modules/
 RagFrontend/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+

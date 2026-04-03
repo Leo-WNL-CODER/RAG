@@ -10,7 +10,6 @@ use std::collections::BTreeMap;
 use crate::{AppState, rag_fn::generate_accesstoken::PayloadAccess};
 
 pub async fn is_auth(State(state): State<Arc<AppState>>, cookies: Cookies, mut req: Request, next: Next) -> Response {
-    println!("Auth middleware called");
     let pool = &state.db_pool;
     if let Some(access_token)=cookies.get("access_token"){
         // verifying the access token
@@ -21,7 +20,6 @@ pub async fn is_auth(State(state): State<Arc<AppState>>, cookies: Cookies, mut r
         let Ok(_) = sqlx::query(r#"
         SELECT * FROM users WHERE id=$1 
         "#).bind(user.id).fetch_one(pool).await else {
-            println!("User not found");
             return StatusCode::UNAUTHORIZED.into_response()
         };
 
@@ -29,7 +27,6 @@ pub async fn is_auth(State(state): State<Arc<AppState>>, cookies: Cookies, mut r
         req.extensions_mut().insert(user.clone());
         return next.run(req).await;
     };
-    println!("No access token");
     StatusCode::UNAUTHORIZED.into_response()
 
 

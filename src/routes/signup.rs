@@ -16,16 +16,16 @@ pub struct SignUpPayload{
 pub async fn user_signup(
     State(state): State<Arc<AppState>>,
     Json(user): Json<SignUpPayload>
-)->String {   
+)->impl IntoResponse {   
     if user.email.len()==0||user.password.len()==0{
-        return "Invalid User Info...".into()
+        return (StatusCode::BAD_REQUEST, "Invalid User Info...".to_string()).into()
     }
     let pool = &state.db_pool;
     let salt=SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let Ok(password_hash)=argon2.hash_password(user.password.as_bytes(), &salt)
     else {
-        return "Enter Password again".into()
+        return (StatusCode::BAD_REQUEST, "Enter Password again".to_string()).into()
     };
     
     let Ok(_) = sqlx::query(
@@ -40,10 +40,10 @@ pub async fn user_signup(
     .execute(pool)
     .await
     else {
-        return "Failed to save the info".into();
+        return (StatusCode::BAD_REQUEST, "Failed to save the info".to_string()).into();
     };
     
 
 
-    "SignUp is successful".into()
+    (StatusCode::OK, "SignUp is successful".to_string()).into()
 }
