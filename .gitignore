@@ -2,6 +2,7 @@
 .env
 rag_env/
 qdrant_storage/
+models/
 node_modules/
 RagFrontend/node_modules/
 
