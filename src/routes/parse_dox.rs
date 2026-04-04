@@ -26,26 +26,27 @@ pub async fn parse_doc(
 
     let field = match multipart.next_field().await {
         Ok(Some(f)) => f,
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        _ => { eprintln!("[parse_doc] ERR: multipart field missing"); return StatusCode::BAD_REQUEST.into_response() },
     };
 
     let file_name = field.file_name().unwrap_or("").to_string();
+    eprintln!("[parse_doc] file_name={}", file_name);
 
     let data = match field.bytes().await {
         Ok(d) => d,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Err(e) => { eprintln!("[parse_doc] ERR: bytes read failed: {}", e); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
     };
 
-    // ---- Send to Python parser ----
     let part = match Part::bytes(data.to_vec())
         .file_name(file_name.clone())
         .mime_str("application/octet-stream")
     {
         Ok(p) => p,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Err(e) => { eprintln!("[parse_doc] ERR: mime_str failed: {}", e); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
     };
 
     let parser_url = &state.parser_url;
+    eprintln!("[parse_doc] calling parser at {}", parser_url);
 
     let res = match client
         .post(parser_url)
@@ -54,18 +55,22 @@ pub async fn parse_doc(
         .await
     {
         Ok(r) => r,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Err(e) => { eprintln!("[parse_doc] ERR: parser request failed: {}", e); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
     };
+
+    eprintln!("[parse_doc] parser status={}", res.status());
 
     let PythonRes { text } = match res.json::<PythonRes>().await {
         Ok(v) => v,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Err(e) => { eprintln!("[parse_doc] ERR: json parse failed: {}", e); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
     };
 
     let text = match text {
         Some(t) => t,
-        None => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        None => { eprintln!("[parse_doc] ERR: text is None"); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
     };
+
+    eprintln!("[parse_doc] text_len={}", text.len());
 
     if text.is_empty(){
         return StatusCode::BAD_REQUEST.into_response();
@@ -74,12 +79,13 @@ pub async fn parse_doc(
     if text.len()>100_000{
         return StatusCode::BAD_REQUEST.into_response();
     }
-    // ---- Chunking ----
+
     let enc = match state.tokenizer.encode(text.clone(), true) {
         Ok(e) => e,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Err(e) => { eprintln!("[parse_doc] ERR: tokenizer failed: {}", e); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
     };
 
+    eprintln!("[parse_doc] tokenized, starting chunking");
 
     let chunks = match spawn_blocking({
         let state = state.clone();
@@ -91,42 +97,46 @@ pub async fn parse_doc(
     .await
     {
         Ok(Ok(c)) => c,
-        _=> return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        e => { eprintln!("[parse_doc] ERR: chunking failed: {:?}", e); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
     };
 
+    eprintln!("[parse_doc] chunks={}", chunks.len());
 
     let Some(access_cookie)=(cookie.get("access_token")) else {
+        eprintln!("[parse_doc] ERR: no access_token cookie");
         return StatusCode::NOT_FOUND.into_response();
     };
-    
     
     let mut points: Vec<PointStruct>=vec![];
     
     let Ok(user) = parse_access_token(access_cookie, &state.jwt_secret) else{
+        eprintln!("[parse_doc] ERR: token parse failed");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response()
     };
+
+    eprintln!("[parse_doc] user_id={}", user.id);
     
     let Ok(_)=sqlx::query("DELETE FROM doc_info where user_id=$1")
     .bind(&user.id)
     .execute(pg_pool)
     .await else {
+        eprintln!("[parse_doc] ERR: DELETE doc_info failed");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response()
     };
+
+    eprintln!("[parse_doc] DELETE ok, deleting qdrant points");
+
     match state.client
     .delete_points( DeletePointsBuilder::new("test_collection")
     .points(Filter::must([Condition::matches(
         "user_id",user.id.to_string().clone(),
     )]))
     .wait(true),).await {
-        Ok(r)=>{
-            },
-        Err(e)=>{
-            
-        }
+        Ok(_)=> eprintln!("[parse_doc] qdrant delete ok"),
+        Err(e)=> eprintln!("[parse_doc] WARN: qdrant delete failed: {}", e),
     };
 
     let doc_id = Uuid::new_v4();
-
 
     let Ok(_) =  sqlx::query(
         "INSERT INTO doc_info (doc_id, user_id, file_name) VALUES ($1, $2, $3)",
@@ -136,8 +146,11 @@ pub async fn parse_doc(
     .bind(file_name.clone())
     .execute(pg_pool)
     .await else {
+        eprintln!("[parse_doc] ERR: INSERT doc_info failed");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response()
     };
+
+    eprintln!("[parse_doc] INSERT doc_info ok, building qdrant points");
 
     for (_i,(v,span)) in chunks.iter().enumerate(){
         let point_id = Uuid::new_v4().to_string();
@@ -146,6 +159,7 @@ pub async fn parse_doc(
         "user_id":&user.id,
         "doc_id":&doc_id
         })) else{
+            eprintln!("[parse_doc] ERR: payload build failed");
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         };
         let p=PointStruct::new(
@@ -155,12 +169,17 @@ pub async fn parse_doc(
         );
         points.push(p);
     }
+
+    eprintln!("[parse_doc] upserting {} points to qdrant", points.len());
         
     let Ok(_insert_res) = state.client
     .upsert_points(UpsertPointsBuilder::new("test_collection", points).wait(true))
     .await else {
+        eprintln!("[parse_doc] ERR: qdrant upsert failed");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response()
     }; 
+
+    eprintln!("[parse_doc] SUCCESS");
     
     (
         StatusCode::ACCEPTED,
