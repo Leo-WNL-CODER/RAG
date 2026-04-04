@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import api from "../api";
 import { Upload, Send, FileText, CheckCircle2, AlertCircle, Loader2, X, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,15 +9,24 @@ export const Dashboard = () => {
   const { logout } = useAuth();
   const [selectedFile, setSelectedFile] = useState(null);
   const [query, setQuery] = useState("");
-  const [queryResponse, setQueryResponse] = useState("");
+  const [messages, setMessages] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isQuerying, setIsQuerying] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const allowedExtensions = ['pdf', 'docx', 'txt'];
   const maxFileSize = 10 * 1024 * 1024; // 10MB
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isQuerying]);
 
   const validateFile = (file) => {
     const extension = file.name.split('.').pop().toLowerCase();
@@ -44,7 +53,7 @@ export const Dashboard = () => {
     setSelectedFile(file);
     setUploadSuccess(false);
     setError("");
-    setQueryResponse("");
+    setMessages([]);
   };
 
   const handleUpload = async (e) => {
@@ -81,18 +90,21 @@ export const Dashboard = () => {
 
   const handleUserQuery = async (e) => {
     e?.preventDefault();
-    if (!query.trim()) return;
+    const currentQuery = query.trim();
+    if (!currentQuery) return;
     if (!uploadSuccess) {
       setError('Please upload a document first.');
       return;
     }
 
+    setMessages(prev => [...prev, { role: 'user', content: currentQuery }]);
+    setQuery("");
     setIsQuerying(true);
     setError("");
 
     try {
-      const response = await api.get(`/userQuery?q=${encodeURIComponent(query)}`);
-      setQueryResponse(response.data);
+      const response = await api.get(`/userQuery?q=${encodeURIComponent(currentQuery)}`);
+      setMessages(prev => [...prev, { role: 'assistant', content: response.data }]);
     } catch (err) {
       setError('Error processing query. Please try again.');
     } finally {
@@ -103,7 +115,7 @@ export const Dashboard = () => {
   const resetAll = () => {
     setSelectedFile(null);
     setQuery("");
-    setQueryResponse("");
+    setMessages([]);
     setUploadSuccess(false);
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -198,7 +210,7 @@ export const Dashboard = () => {
 
         {/* Main: Chat */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col min-h-[500px]">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col min-h-[500px] max-h-[600px]">
             <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <h2 className="font-semibold text-gray-900 dark:text-white">AI Assistant</h2>
               <div className="flex items-center gap-2">
@@ -223,23 +235,39 @@ export const Dashboard = () => {
                     Upload a file to enable the chat interface and start asking questions.
                   </p>
                 </div>
-              ) : queryResponse ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
-                >
-                  <div className="flex justify-end">
-                    <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 max-w-[80%] shadow-sm">
-                      <p className="text-sm">{query}</p>
+              ) : messages.length > 0 ? (
+                <div className="space-y-4">
+                  {messages.map((msg, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={cn(
+                        "flex",
+                        msg.role === 'user' ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "rounded-2xl px-4 py-2.5 max-w-[80%] shadow-sm",
+                          msg.role === 'user'
+                            ? "bg-indigo-600 text-white rounded-tr-none"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-200 dark:border-gray-700"
+                        )}
+                      >
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {isQuerying && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-tl-none px-4 py-2.5 shadow-sm border border-gray-200 dark:border-gray-700">
+                        <Loader2 className="animate-spin text-gray-400" size={18} />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] shadow-sm border border-gray-200 dark:border-gray-700">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{queryResponse}</p>
-                    </div>
-                  </div>
-                </motion.div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
                   <p className="text-sm text-gray-500">Document ready. Ask anything!</p>
