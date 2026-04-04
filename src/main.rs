@@ -53,7 +53,9 @@ async fn main() -> Result<()> {
         .expect("REDIS_URL must be set");
     let redis_client = redis::Client::open(redis_url)?;
 
-    let reqwest_client = reqwest::Client::new();
+    let reqwest_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(90))
+        .build()?;
     let jwt_secret = std::env::var("JWT_ACCESS_TOKEN_SECRET")
         .expect("JWT_ACCESS_TOKEN_SECRET must be set");
     let parser_url = std::env::var("PYTHON_PARSER_URL")
