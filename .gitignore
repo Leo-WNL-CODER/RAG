@@ -2,6 +2,7 @@
 .env
 rag_env/
 qdrant_storage/
+models/model.onnx
 node_modules/
 RagFrontend/node_modules/
 
