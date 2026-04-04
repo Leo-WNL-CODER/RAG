@@ -60,6 +60,11 @@ pub async fn parse_doc(
 
     eprintln!("[parse_doc] parser status={}", res.status());
 
+    if !res.status().is_success() {
+        eprintln!("[parse_doc] ERR: parser returned non-2xx: {}", res.status());
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
     let PythonRes { text } = match res.json::<PythonRes>().await {
         Ok(v) => v,
         Err(e) => { eprintln!("[parse_doc] ERR: json parse failed: {}", e); return StatusCode::INTERNAL_SERVER_ERROR.into_response() },
